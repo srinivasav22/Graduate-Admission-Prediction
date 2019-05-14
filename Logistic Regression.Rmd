@@ -1,0 +1,402 @@
+---
+title: "Prediction of Term Deposit Subscription"
+author: "Srinivasa V"
+date: "14th May 2019"
+output:
+  html_document:
+    toc: yes
+    toc_depth: 3
+    toc_float: yes
+---
+
+**NOTE** Before starting this assignment please remember to clear your environment, you can do that by running the following code 
+
+```{r}
+
+rm(list=ls(all=TRUE))
+
+```
+
+# Agenda 
+
+* Get the data
+
+* Data Pre-processing
+
+* Build a model
+
+* Predictions
+
+* Communication
+
+# Reading & Understanding the Data
+
+## Data Domain and Format
+
+* The data given to you will be in a .txt file.
+
+* The values on each line of the dataset are separated by ";"
+
+* Read in the data using the "read.table()" function.
+
+## Read the Data
+
+Make sure the dataset is located in your current working directory, else you can change your working directory using the "setwd()" function.
+
+```{r}
+
+bank_data <- read.table("bank.txt", header=T, sep=";")
+
+```
+
+
+## Data Description
+
+* The dataset is from a bank, using which we have to predict whether the subject subscribes to a term deposit or not
+
+* The dataset has the following attributes:
+
+1 - age (numeric)
+
+2 - job : type of job (categorical: "admin.","unknown","unemployed","management","housemaid","entrepreneur","student",                              "blue-collar","self-employed","retired","technician","services") 
+
+3 - marital : marital status (categorical: "married","divorced","single"; note: "divorced" means divorced or widowed)
+
+4 - education (categorical: "unknown","secondary","primary","tertiary")
+
+5 - default: has credit in default? (binary: "yes","no")
+
+6 - balance: average yearly balance, in euros (numeric) 
+
+7 - housing: has housing loan? (binary: "yes","no")
+
+8 - loan: has personal loan? (binary: "yes","no")
+
+9 - contact: contact communication type (categorical: "unknown","telephone","cellular") 
+
+10 - day: last contact day of the month (numeric)
+
+11 - month: last contact month of year (categorical: "jan", "feb", "mar", ..., "nov", "dec")
+
+12 - duration: last contact duration, in seconds (numeric)
+
+13 - campaign: number of contacts performed during this campaign and for this client (numeric, includes last contact)
+
+14 - pdays: number of days that passed by after the client was last contacted from a previous campaign (numeric, -1 means client was not previously contacted)
+  
+15 - previous: number of contacts performed before this campaign and for this client (numeric)
+
+16 - poutcome: outcome of the previous marketing campaign (categorical: "unknown","other","failure","success")
+
+__Response Variable (desired target):__
+
+17 - y - has the client subscribed to a __term deposit?__ (binary: "yes","no")
+
+## Understand the data
+
+* Use the str() function to get the dimensions and types of attributes in the dataset
+
+* The dataset has 4521 observations and 17 variables
+
+```{r}
+
+str(bank_data)
+
+```
+
+
+* Use the summary() function to understand the distribution of variables in the dataset
+
+```{r}
+
+summary(bank_data)
+
+```
+
+* Use the head() and tail() functions to get a look at the data
+
+```{r}
+
+head(bank_data)
+
+tail(bank_data)
+
+```
+
+
+# Data Pre-processing
+
+## Missing Values
+
+* Check the number of missing values in the data frame
+
+```{r}
+
+sum(is.na(bank_data))
+
+```
+
+## Train/Test Split
+
+* Split the data 70/30 into train and test sets by using __Stratified Sampling__ and setting the seed as "786"
+
+* Split the data using stratified sampling, we can do that by using the createDataPartition() function from the caret package
+
+
+```{r}
+
+library(caret)
+
+set.seed(786)
+
+# The argument "y" to the createDataPartition() function is the response variable
+
+# The argument "p" is the percentage of data that goes to training
+
+# The argument "list" should be input a boolean (T or F). Remember to put list = F, else the output is going to  be a list and your data can't be subsetted with it
+
+train_rows <- createDataPartition(bank_data$y, p = 0.7, list = F)
+
+train_data <- bank_data[train_rows, ]
+
+test_data <- bank_data[-train_rows, ]
+
+```
+```{r}
+dim(train_rows)
+
+```
+
+```{r}
+
+str(train_data)
+
+```
+
+# Build a model
+
+## Basic Logistic Regression Model
+
+* Use the glm() function to build a basic model
+
+* Build a model using all the variables, excluding the response variable, in the dataset
+
+```{r}
+
+log_reg <- glm(y~., data = train_data, family = binomial)
+
+
+```
+
+
+
+* Get the summary of the model and understand the output
+
+```{r}
+
+summary(log_reg)
+
+
+```
+
+* Calcuating the Deviance Residuals
+```{r}
+
+Devaince_residuals = residuals(log_reg, "deviance")
+summary(Devaince_residuals)
+
+```
+* Calculating the log likeli hood
+```{r}
+
+logLik(log_reg)
+
+```
+
+# ROC
+
+## Predicted Values are between 0 and 1
+
+* The predict() function on the "glm" object of "binomial" family gives a probability score between 0 and 1, NOT the original levels (0 and 1) of the response variable 
+
+* Hence we must first choose a cutoff point for getting to the original levels of the response variables
+
+* To choose the cutoff point we will use the train data, as test data should not be used to make any decisions regarding the model
+
+## Creating an ROC plot
+
+__Steps to create an ROC plot :__
+
+1) Get a list of predictions (probability scores) using the predict() function
+
+```{r}
+
+# Use the argument 'type = "response"' in the predict function to get a list of predictions between 0 and 1
+
+# By default if no dataset is mentioned, training data is used
+
+prob_train <- predict(log_reg, type = "response")
+
+prob_train[1:6]
+```
+
+2) Using the ROCR package create a "prediction()" object
+
+```{r}
+
+library(ROCR)
+
+# The prediction object takes the probability scores and the original levels for theses data as input
+
+pred <- prediction(prob_train, train_data$y)
+
+# The prediction object contains a list of predictions (probability scores), original class labels, cutoffs, false positives, true positives, true negatives, false negatives, No. of positive predictions and No. of negative predictions corresponding to these cutoffs. Class distribution in the dataset.
+
+
+```
+
+```{r}
+
+pred
+
+
+```
+
+3) Extract performance measures (True Positive Rate and False Positive Rate) using the "performance()" function from the ROCR package
+
+```{r}
+
+# The performance() function from the ROCR package helps us extract metrics such as True positive rate, False positive rate etc. from the prediction object, we created above.
+
+# Two measures (y-axis = tpr, x-axis = fpr) are extracted
+
+perf <- performance(pred, measure="tpr", x.measure="fpr")
+
+
+```
+
+4) Plot the ROC curve using the extracted performance measures (TPR and FPR)
+
+```{r}
+
+plot(perf, col=rainbow(10), colorize=T, print.cutoffs.at=seq(0,1,0.05))
+
+```
+
+* Extract the AUC score of the ROC curve and store it in a variable named "auc"
+
+* Use the performance() function on the prediction object created above using the ROCR package, to extract the AUC score
+
+```{r}
+
+perf_auc <- performance(pred, measure="auc")
+
+# Access the auc score from the performance object
+
+auc <- perf_auc@y.values[[1]]
+
+print(auc)
+
+```
+
+
+
+## Choose a Cutoff Value
+
+* Based on the trade off between TPR and FPR depending on the business domain, a call on the cutoff has to be made.
+
+* A cutoff of 0.1 can be chosen
+
+
+## Predictions on test data
+
+* After choosing a cutoff value of 0.1, let's predict the class labels on the test data using our model
+
+```{r}
+
+prob_test <- predict(log_reg, test_data, type = "response")
+
+preds_test <- ifelse(prob_test > 0.1, "yes", "no")
+
+
+```
+
+
+# Evaluation Metrics for classification
+
+## Manual Computation
+
+### Confusion Matrix
+
+* Create a confusion matrix using the table() function
+
+```{r}
+
+test_data_labs <- test_data$y
+
+conf_matrix <- table(test_data_labs, preds_test)
+
+print(conf_matrix)
+
+```
+
+### Specificity
+
+* The Proportion of correctly identified negatives by the test/model.
+
+$${Specificity} = \frac{Number~of~True~Negatives}{Number~of~True~Negatives + Number~of~False~Positives}$$
+
+```{r}
+
+specificity <- conf_matrix[1, 1]/sum(conf_matrix[1, ])
+
+print(specificity)
+
+```
+
+
+### Sensitivity
+
+* The Proportion of correctly identified positives by the test/model.
+
+$${Sensitivity} = \frac{Number~of~True~Positives}{Number~of~True~Positives + Number~of~False~Negatives}$$
+
+```{r}
+
+sensitivity <- conf_matrix[2, 2]/sum(conf_matrix[2, ])
+
+print(sensitivity)
+
+```
+
+### Accuracy
+
+* The Proportion of correctly identified psotivies/negatives in the entire population by the test/model
+
+$${Accuracy} = \frac{Number~of~True~Positives +Number~of~True~Negatives}{Number~Of~Subjects~in~the~Population}$$
+
+```{r}
+
+accuracy <- sum(diag(conf_matrix))/sum(conf_matrix)
+
+print(accuracy)
+
+```
+
+## Automated Computation through Caret
+
+* Evaluation metrics for classification can be accessed through the "confusionMatrix()" function from the caret package
+
+```{r}
+
+#library(caret)
+
+# Using the argument "Positive", we can get the evaluation metrics according to our positive referene level
+
+#confusionMatrix(preds_test, test_data$y, positive = "yes")
+
+
+```
+
+
+
